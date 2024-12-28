@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net6.0</TargetFramework>
@@ -36,6 +36,7 @@
     <Reference Include="$(GameDir)\BepInEx\interop\*.dll" Private="false" />
     <PackageReference Include="BepInEx.Analyzers" Version="1.0.8" PrivateAssets="all" />
     <PackageReference Include="BepInEx.PluginInfoProps" Version="2.1.0" />
+    <ProjectReference Include="..\Libraries\tja2fumen\tja2fumen.csproj" />
     <Reference Include="$(SolutionDir)\Libraries\SonicAudioLib.dll" Private="false" />
   </ItemGroup>
 

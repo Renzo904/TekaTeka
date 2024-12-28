@@ -6,128 +6,13 @@ namespace TekaTeka.Utils
 {
     internal class ModdedSongsManager
     {
-        private HashSet<int> currentSongs = new HashSet<int>();
-        private Dictionary<int, string> uniqueIdToModName = new Dictionary<int, string>();
-        private Dictionary<string, string> idToModName = new Dictionary<string, string>();
-        private Dictionary<string, string> songFileToModName = new Dictionary<string, string>();
-        private MusicDataInterface musicData => TaikoSingletonMonoBehaviour<DataManager>.Instance.MusicData;
-        private InitialPossessionDataInterface initialPossessionData =>
+        public HashSet<int> currentSongs = new HashSet<int>();
+        public Dictionary<int, SongMod> uniqueIdToMod = new Dictionary<int, SongMod>();
+        public Dictionary<string, SongMod> idToMod = new Dictionary<string, SongMod>();
+        public Dictionary<string, SongMod> songFileToMod = new Dictionary<string, SongMod>();
+        public MusicDataInterface musicData => TaikoSingletonMonoBehaviour<DataManager>.Instance.MusicData;
+        public InitialPossessionDataInterface initialPossessionData =>
             TaikoSingletonMonoBehaviour<DataManager>.Instance.InitialPossessionData;
-
-        public class SongMod
-        {
-            public string modFolder;
-            public string modName;
-            public bool enabled;
-            public List<MusicDataInterface.MusicInfo> songList = new List<MusicDataInterface.MusicInfo>();
-
-            public SongMod(string modName)
-            {
-                this.modFolder = modName;
-                string modPath = Path.Combine(CustomSongLoader.songsPath, this.modFolder);
-
-                StreamReader configToml;
-
-                if (!this.IsValidMod())
-                {
-                    this.enabled = false;
-                    return;
-                }
-
-                TomlTable? table = null;
-
-                try
-                {
-                    configToml = File.OpenText(Path.Combine(modPath, "config.toml"));
-
-                    table = TOML.Parse(configToml);
-                }
-                catch (Exception e)
-                {
-                    if (e.GetType() != typeof(IOException))
-                    {
-                        Logger.Log($"'config.toml' not found in mod {modName}. Creating...", LogType.Warning);
-                    }
-                    else if (e.GetType() != typeof(TomlParseException))
-                    {
-                        Logger.Log($"'config.toml' from {modName} was not valid. Recreating...", LogType.Warning);
-                    }
-                }
-
-                if (table == null)
-                {
-                    table = new TomlTable();
-                    table.Add("enabled", true);
-                    table.Add("name", modName);
-                    table.Add("version", "0.1");
-                    table.Add("description", "");
-
-                    using (StreamWriter writer = File.CreateText(Path.Combine(modPath, "config.toml")))
-                    {
-                        table.WriteTo(writer);
-                        writer.Flush();
-                    }
-                }
-
-                this.enabled = table["enabled"].IsBoolean ? table["enabled"].AsBoolean.Value : true;
-                this.modName = table["name"].IsString ? table["name"].AsString.Value : modName;
-
-                if (!this.enabled)
-                {
-                    Logger.Log($"Mod {this.modName} explicitly disabled, skipping...", LogType.Debug);
-                    return;
-                }
-
-                if (this.ReadMusicDb())
-                {
-                    this.enabled = true;
-                };
-            }
-
-            public bool IsValidMod()
-            {
-                string modFolder = Path.Combine(CustomSongLoader.songsPath, this.modFolder);
-                string musicDataPath = Path.Combine(modFolder, CustomSongLoader.ASSETS_FOLDER, "musicinfo");
-                if (!Directory.Exists(modFolder))
-                {
-                    return false;
-                }
-
-                if (!File.Exists(musicDataPath + ".json") && !File.Exists(musicDataPath + ".bin"))
-                {
-                    return false;
-                }
-
-                return true;
-            }
-
-            public bool ReadMusicDb()
-            {
-                string musicDataPath = Path.Combine(CustomSongLoader.songsPath, this.modFolder,
-                                                    CustomSongLoader.ASSETS_FOLDER, "musicinfo");
-                string jsonString;
-                if (File.Exists(musicDataPath + ".json"))
-                {
-                    musicDataPath += ".json";
-                    jsonString = File.ReadAllText(musicDataPath);
-                }
-                else if (File.Exists(musicDataPath + ".bin"))
-                {
-                    musicDataPath += ".bin";
-                    var bytes = Cryptgraphy.ReadAllAesAndGZipBytes(musicDataPath, Cryptgraphy.AesKeyType.Type2);
-                    jsonString = Encoding.UTF8.GetString(bytes);
-                }
-                else
-                {
-                    Logger.Log($"File \"musicinfo\" at {musicDataPath + "{.bin/.json}"} not present", LogType.Warning);
-                    return false;
-                }
-
-                this.songList.AddRange(JsonSupports.ReadJson<MusicDataInterface.MusicInfo>(jsonString));
-
-                return true;
-            }
-        }
 
         public ModdedSongsManager()
         {
@@ -147,10 +32,10 @@ namespace TekaTeka.Utils
                 string folder = Path.GetFileName(path) ?? "";
                 if (folder != "")
                 {
-                    SongMod mod = new SongMod(folder);
+                    FumenSongMod mod = new FumenSongMod(folder);
                     if (mod.enabled)
                     {
-                        Logger.Log($"Mod {mod.modFolder} Loaded", LogType.Info);
+                        Logger.Log($"Mod {mod.modName} Loaded", LogType.Info);
                         mods.Add(mod);
                     }
                 }
@@ -165,66 +50,36 @@ namespace TekaTeka.Utils
             {
                 if (mod.enabled)
                 {
-                    int songsAdded = this.AddMod(mod);
-                    Logger.Log($"{songsAdded} out of {mod.songList.Count} songs were added from mod \"{mod.modName}\"");
+                    mod.AddMod(this);
                 }
             }
         }
 
-        public int AddMod(SongMod mod)
+        public SongMod? GetModPath(int uniqueId)
         {
-            int songsAdded = 0;
-            for (int i = 0; i < mod.songList.Count; i++)
+            if (this.uniqueIdToMod.ContainsKey(uniqueId))
             {
-                MusicDataInterface.MusicInfo song = mod.songList[i];
-                if (!this.currentSongs.Contains(song.UniqueId))
-                {
-                    songsAdded++;
-                    this.currentSongs.Add(song.UniqueId);
-                    songFileToModName.Add(song.SongFileName, mod.modFolder);
-                    uniqueIdToModName.Add(song.UniqueId, mod.modFolder);
-                    idToModName.Add(song.Id, mod.modFolder);
-
-                    initialPossessionData.InitialPossessionInfoAccessers.Add(
-                        new InitialPossessionDataInterface.InitialPossessionInfoAccessor(
-                            (int)InitialPossessionDataInterface.RewardTypes.Song, song.UniqueId));
-                    musicData.AddMusicInfo(ref song);
-                }
-                else
-                {
-#if DEBUG
-                    Logger.Log($"{song.UniqueId} from {mod.modName} Skipped", LogType.Debug);
-#endif
-                }
-            }
-            return songsAdded;
-        }
-
-        public string GetModPath(int uniqueId)
-        {
-            if (this.uniqueIdToModName.ContainsKey(uniqueId))
-            {
-                return this.uniqueIdToModName[uniqueId];
+                return this.uniqueIdToMod[uniqueId];
             }
             else
             {
-                return "";
+                return null;
             }
         }
 
-        public string GetModPath(string songFileName)
+        public SongMod? GetModPath(string songFileName)
         {
-            if (this.songFileToModName.ContainsKey(songFileName))
+            if (this.songFileToMod.ContainsKey(songFileName))
             {
-                return this.songFileToModName[songFileName];
+                return this.songFileToMod[songFileName];
             }
-            else if (this.idToModName.ContainsKey(songFileName))
+            else if (this.idToMod.ContainsKey(songFileName))
             {
-                return this.idToModName[songFileName];
+                return this.idToMod[songFileName];
             }
             else
             {
-                return "";
+                return null;
             }
         }
     }

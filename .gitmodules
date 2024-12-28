@@ -1,0 +1,3 @@
+[submodule "Libraries/tja2fumen"]
+	path = Libraries/tja2fumen
+	url = https://github.com/Renzo904/tja2fumen-net
