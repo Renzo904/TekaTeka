@@ -185,8 +185,8 @@ namespace TekaTeka.Plugins
             __instance.DestroyFumenBuffer();
 
             string fileName = Path.GetFileNameWithoutExtension(filePath);
-            string songId = fileName.Substring(0, fileName.LastIndexOf('_')); // abcdef_e -> abcdef
-            string diff = fileName.Substring(fileName.LastIndexOf('_') + 1);
+            string songId = fileName.Split("_").First();
+
             Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray<byte> bytes;
 
             SongMod? mod = songsManager.GetModPath(songId);
