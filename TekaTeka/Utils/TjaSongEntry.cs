@@ -1,4 +1,5 @@
 using TekaTeka.Plugins;
+using tja2fumen;
 
 namespace TekaTeka.Utils
 {
@@ -24,6 +25,22 @@ namespace TekaTeka.Utils
             this.genre = genre;
             this.modPath = modFolderPath;
             song = tja2fumen.Parsers.ParseTja(this.tjaPath);
+            tja2fumen.FumenCourse? fumenCourse = null;
+            int[] shinuchiScores = new int[5];
+            int i = 0;
+            foreach (string diff in tja2fumen.Constants.COURSE_NAMES)
+            {
+                if (song.courses.ContainsKey(diff))
+                {
+                    fumenCourse = tja2fumen.Converters.ConvertTjaToFumen(song.courses[diff]);
+                    shinuchiScores[i] = fumenCourse.shinuchiScore;
+                }
+                else
+                {
+                    shinuchiScores[i] = 0;
+                }
+                i++;
+            }
 
             uint songHash = _3rdParty.MurmurHash2.Hash(File.ReadAllBytes(this.tjaPath)) & 0xFFFF_FFF;
 
@@ -45,6 +62,11 @@ namespace TekaTeka.Utils
                                                                 SongSubES = this.song.metadata.subtitle,
                                                                 SongSubDE = this.song.metadata.subtitle,
                                                                 SongSubIT = this.song.metadata.subtitle,
+                                                                ShinutiEasy = shinuchiScores[0],
+                                                                ShinutiNormal = shinuchiScores[1],
+                                                                ShinutiHard = shinuchiScores[2],
+                                                                ShinutiMania = shinuchiScores[3],
+                                                                ShinutiUra = shinuchiScores[4],
                                                                 SongFileName = $"SONG_{songHash}",
                                                                 GenreNo = (int)this.genre,
                                                                 Order = 1300000,
